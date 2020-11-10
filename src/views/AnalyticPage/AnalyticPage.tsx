@@ -131,10 +131,6 @@ export const AnalyticPage = () => {
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    console.log(currentPlayback)
-  }, [currentPlayback])
-
   return (
     <div>
       {loading ? (
