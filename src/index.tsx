@@ -7,10 +7,14 @@ import 'fontsource-roboto'
 import { createMuiTheme, ThemeProvider } from '@material-ui/core'
 import CssBaseline from '@material-ui/core/CssBaseline'
 import { BrowserRouter } from 'react-router-dom'
+import green from '@material-ui/core/colors/green'
 
 const darkTheme = createMuiTheme({
   palette: {
     type: 'dark',
+    primary: {
+      main: green[600],
+    },
   },
 })
 
