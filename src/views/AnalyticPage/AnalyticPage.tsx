@@ -24,9 +24,10 @@ const {
   getMyRecentlyPlayedTracks,
   getMyTopTracks,
   getMyCurrentPlaybackState,
+  getMyTopArtists,
 } = new Spotify()
 
-const albumSide = 220
+const albumSide = '220'
 
 const useStyles = makeStyles((theme) => ({
   cardHeader: {
@@ -40,7 +41,6 @@ const useStyles = makeStyles((theme) => ({
   },
   card: {
     width: albumSide,
-    margin: 10,
     position: 'relative',
     ['&:hover .MuiCardHeader-root']: {
       opacity: 1,
@@ -57,6 +57,15 @@ const useStyles = makeStyles((theme) => ({
     height: 200,
     width: 200,
   },
+  gridBox: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gridGap: "10px",
+  },
+  cardArtistHeader: {
+    background: theme.palette.secondary.light,
+    height: '50px'
+  }
 }))
 
 type PlayHistoryObject = {
@@ -68,6 +77,7 @@ export const AnalyticPage = () => {
   const [recentlyPlayedTracks, setRecentlyPlayedTracks] = useState<PlayHistoryObject[]>([])
   const [topTracks, setTopTracks] = useState<SpotifyApi.TrackObjectFull[]>([])
   const [artistsInfo, setArtistsInfo] = useState<SpotifyApi.ArtistObjectFull[]>([])
+  const [topArtists, setTopArtists] = useState<SpotifyApi.ArtistObjectFull[]>([])
   const [
     currentPlayback,
     setCurrentPlayback,
@@ -94,19 +104,20 @@ export const AnalyticPage = () => {
       setAccessToken(token)
       setLoading(true)
       Promise.all([
-        getMySavedAlbums({ limit: 10 }).then((res) => {
+        getMySavedAlbums({ limit: 9 }).then((res) => {
           setLatestAlbums(res.items)
           return res
         }),
-        getMyRecentlyPlayedTracks({ limit: 10 }).then((res) => {
+        getMyRecentlyPlayedTracks({ limit: 9 }).then((res) => {
           setRecentlyPlayedTracks(res.items as PlayHistoryObject[])
           return res
         }),
-        getMyTopTracks({ limit: 10 }).then((res) => {
+        getMyTopTracks({ limit: 9, time_range: 'short_term' }).then((res) => {
           setTopTracks(res.items)
           return res
         }),
         getMyCurrentPlaybackState().then(setCurrentPlayback),
+        getMyTopArtists({ limit: 18 }).then(res => setTopArtists(res.items))
       ])
         .then(([res1, res2, res3]) =>
           getArtists(
@@ -120,6 +131,10 @@ export const AnalyticPage = () => {
         .then((res) => {
           setArtistsInfo(res.artists)
           setLoading(false)
+        })
+        .catch(() => {
+          setCookie('token', null)
+          window.location.assign(spotifyHref)
         })
     }
   }, [token])
@@ -136,187 +151,216 @@ export const AnalyticPage = () => {
       {loading ? (
         <CircularProgress />
       ) : (
-        <>
-          {currentPlayback && (
-            <Box>
-              <Typography variant="h2" gutterBottom>
-                Now Playing
-              </Typography>
+          <>
+            <Box display="flex" justifyContent="center" style={{ marginTop: "3vw" }}>
+              {currentPlayback && (
+                <Box>
+                  <Box display="inline-flex" paddingBottom="50px">
+                    <CardActionArea onClick={() => currentPlayback?.item?.uri && window.location.assign(currentPlayback?.item?.uri)}>
+                      <Card className={classes.currentPlayCard}>
+                        <Box width="300px">
+                          <CardContent style={{ height: '100%' }}>
+                            <Box display="flex" flexDirection="column" height="100%">
+                              <Box flexGrow={1}>
+                                <Typography variant="h5">
+                                  Now playing: <strong>{currentPlayback.item?.name}</strong>
+                                </Typography>
+                                <Typography variant="subtitle1">
+                                  {currentPlayback.item?.artists.map(artist => artist.name).join(', ')}
+                                </Typography>
+                                <Typography variant="subtitle2" color="textSecondary">
+                                  {currentPlayback.item?.album.name}
+                                </Typography>
+                              </Box>
 
-              <Box display="inline-flex" paddingBottom="50px">
-                <Card className={classes.currentPlayCard}>
-                  <Box width="300px">
-                    <CardContent style={{ height: '100%' }}>
-                      <Box display="flex" flexDirection="column" height="100%">
-                        <Box flexGrow={1}>
-                          <Typography component="h5" variant="h5">
-                            {currentPlayback.item?.name}
-                          </Typography>
-                          <Typography variant="subtitle1" color="textSecondary">
-                            {currentPlayback.item?.album.name}
-                          </Typography>
+                              {currentPlayback.progress_ms &&
+                                currentPlayback.item?.duration_ms && (
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={
+                                      (currentPlayback.progress_ms /
+                                        currentPlayback.item?.duration_ms) *
+                                      100
+                                    }
+                                  />
+                                )}
+                            </Box>
+                          </CardContent>
                         </Box>
-
-                        {currentPlayback.progress_ms &&
-                          currentPlayback.item?.duration_ms && (
-                            <LinearProgress
-                              variant="determinate"
-                              value={
-                                (currentPlayback.progress_ms /
-                                  currentPlayback.item?.duration_ms) *
-                                100
-                              }
-                            />
-                          )}
-                      </Box>
-                    </CardContent>
+                        <CardMedia
+                          className={classes.currentPlayCover}
+                          image={currentPlayback.item?.album.images[0]?.url}
+                        />
+                      </Card>
+                    </CardActionArea>
                   </Box>
-                  <CardMedia
-                    className={classes.currentPlayCover}
-                    image={currentPlayback.item?.album.images[0]?.url}
-                  />
-                </Card>
-              </Box>
+                </Box>
+              )}
             </Box>
-          )}
 
-          <Typography variant="h2">Latest Albums</Typography>
-
-          <Box display="flex" flexWrap="wrap">
-            {latestAlbums.map(({ album: { images, name, artists, uri } }) => {
-              const artistInfo = artistsInfo.find(
-                (info) => info.id === artists[0]?.id
-              )
-              return (
-                <Card key={name} className={classes.card}>
-                  <CardHeader
-                    avatar={
-                      artistInfo && (
-                        <CardActionArea
-                          onClick={() => window.location.assign(artistInfo.uri)}
-                        >
-                          <Avatar
-                            variant="rounded"
-                            src={artistInfo?.images[0]?.url}
-                            className={classes.avatar}
-                          />
-                        </CardActionArea>
-                      )
-                    }
-                    title={name}
-                    subheader={artists.map((artist) => artist.name).join(', ')}
-                    className={classes.cardHeader}
-                  />
-                  <CardActionArea onClick={() => window.location.assign(uri)}>
-                    <CardMedia
-                      component="img"
-                      image={images[0]?.url}
-                      title={name}
-                      height={albumSide}
-                    />
-                  </CardActionArea>
-                </Card>
-              )
-            })}
-          </Box>
-
-          <Typography variant="h2" style={{ marginTop: 50 }}>
-            Top Tracks
-          </Typography>
-          <Box display="flex" flexWrap="wrap">
-            {topTracks.map(({ album: { images }, name, artists, uri }) => {
-              const artistInfo = artistsInfo.find(
-                (info) => info.id === artists[0]?.id
-              )
-              return (
-                <Card key={name} className={classes.card}>
-                  <CardHeader
-                    avatar={
-                      artistInfo && (
-                        <CardActionArea
-                          onClick={() => window.location.assign(artistInfo.uri)}
-                        >
-                          <Avatar
-                            variant="rounded"
-                            src={artistInfo?.images[0]?.url}
-                            className={classes.avatar}
-                          />
-                        </CardActionArea>
-                      )
-                    }
-                    title={name}
-                    subheader={artists.map((artist) => artist.name).join(', ')}
-                    className={classes.cardHeader}
-                  />
-                  <CardActionArea onClick={() => window.location.assign(uri)}>
-                    <CardMedia
-                      component="img"
-                      image={images[0]?.url}
-                      title={name}
-                      height={albumSide}
-                    />
-                  </CardActionArea>
-                </Card>
-              )
-            })}
-          </Box>
-
-          <Typography variant="h2" style={{ marginTop: 50 }}>
-            Latest Songs
-          </Typography>
-          <Box display="flex" flexWrap="wrap">
-            {recentlyPlayedTracks.map(
-              ({
-                track: {
-                  album: { images },
-                  name,
-                  artists,
-                  uri,
-                },
-                played_at,
-              }) => {
-                const artistInfo = artistsInfo.find(
-                  (info) => info.id === artists[0]?.id
-                )
-                return (
-                  <Card key={played_at + name} className={classes.card}>
-                    <CardHeader
-                      avatar={
-                        artistInfo && (
-                          <CardActionArea
-                            onClick={() =>
-                              window.location.assign(artistInfo.uri)
-                            }
-                          >
-                            <Avatar
-                              variant="rounded"
-                              src={artistInfo?.images[0]?.url}
-                              className={classes.avatar}
-                            />
-                          </CardActionArea>
-                        )
-                      }
-                      title={name}
-                      subheader={artists
-                        .map((artist) => artist.name)
-                        .join(', ')}
-                      className={classes.cardHeader}
-                    />
+            <Card style={{ margin: "0 3vw" }}>
+              <CardHeader title="Your Top Artists" />
+              <Box display="grid" gridTemplateColumns="repeat(6, 1fr)" gridGap="20px" padding="0 20px 20px">
+                {topArtists.map(({ name, images, uri }) => (
+                  <Card key={name}>
                     <CardActionArea onClick={() => window.location.assign(uri)}>
                       <CardMedia
                         component="img"
                         image={images[0]?.url}
                         title={name}
-                        height={albumSide}
+                        height={80}
                       />
+                      <CardHeader className={classes.cardArtistHeader} subheader={name} />
                     </CardActionArea>
                   </Card>
-                )
-              }
-            )}
-          </Box>
-        </>
-      )}
+                ))}
+              </Box>
+            </Card>
+
+
+            <Box display="grid" gridTemplateColumns="repeat(2, 1fr)" gridGap="3vw" padding="3vw">
+              <Card>
+                <CardHeader title="Your Latest Albums" />
+                <CardContent>
+                  <Box className={classes.gridBox}>
+                    {latestAlbums.map(({ album: { images, name, artists, uri } }) => {
+                      const artistInfo = artistsInfo.find(
+                        (info) => info.id === artists[0]?.id
+                      )
+                      return (
+                        <Card key={name} className={classes.card}>
+                          <CardHeader
+                            avatar={
+                              artistInfo && (
+                                <CardActionArea
+                                  onClick={() => window.location.assign(artistInfo.uri)}
+                                >
+                                  <Avatar
+                                    variant="rounded"
+                                    src={artistInfo?.images[0]?.url}
+                                    className={classes.avatar}
+                                  />
+                                </CardActionArea>
+                              )
+                            }
+                            title={name}
+                            subheader={artists.map((artist) => artist.name).join(', ')}
+                            className={classes.cardHeader}
+                          />
+                          <CardActionArea onClick={() => window.location.assign(uri)}>
+                            <CardMedia
+                              component="img"
+                              image={images[0]?.url}
+                              title={name}
+                            />
+                          </CardActionArea>
+                        </Card>
+                      )
+                    })}
+                  </Box>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader title="Your Top Tracks" />
+                <CardContent>
+                  <Box className={classes.gridBox}>
+                    {topTracks.map(({ album: { images }, name, artists, uri }) => {
+                      const artistInfo = artistsInfo.find(
+                        (info) => info.id === artists[0]?.id
+                      )
+                      return (
+                        <Card key={name} className={classes.card}>
+                          <CardHeader
+                            avatar={
+                              artistInfo && (
+                                <CardActionArea
+                                  onClick={() => window.location.assign(artistInfo.uri)}
+                                >
+                                  <Avatar
+                                    variant="rounded"
+                                    src={artistInfo?.images[0]?.url}
+                                    className={classes.avatar}
+                                  />
+                                </CardActionArea>
+                              )
+                            }
+                            title={name}
+                            subheader={artists.map((artist) => artist.name).join(', ')}
+                            className={classes.cardHeader}
+                          />
+                          <CardActionArea onClick={() => window.location.assign(uri)}>
+                            <CardMedia
+                              component="img"
+                              image={images[0]?.url}
+                              title={name}
+                            />
+                          </CardActionArea>
+                        </Card>
+                      )
+                    })}
+                  </Box>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader title="Latest Songs" />
+                <CardContent>
+                  <Box className={classes.gridBox}>
+                    {recentlyPlayedTracks.map(
+                      ({
+                        track: {
+                          album: { images },
+                          name,
+                          artists,
+                          uri,
+                        },
+                        played_at,
+                      }) => {
+                        const artistInfo = artistsInfo.find(
+                          (info) => info.id === artists[0]?.id
+                        )
+                        return (
+                          <Card key={played_at + name} className={classes.card}>
+                            <CardHeader
+                              avatar={
+                                artistInfo && (
+                                  <CardActionArea
+                                    onClick={() =>
+                                      window.location.assign(artistInfo.uri)
+                                    }
+                                  >
+                                    <Avatar
+                                      variant="rounded"
+                                      src={artistInfo?.images[0]?.url}
+                                      className={classes.avatar}
+                                    />
+                                  </CardActionArea>
+                                )
+                              }
+                              title={name}
+                              subheader={artists
+                                .map((artist) => artist.name)
+                                .join(', ')}
+                              className={classes.cardHeader}
+                            />
+                            <CardActionArea onClick={() => window.location.assign(uri)}>
+                              <CardMedia
+                                component="img"
+                                image={images[0]?.url}
+                                title={name}
+                              />
+                            </CardActionArea>
+                          </Card>
+                        )
+                      }
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+          </>
+        )}
     </div>
   )
 }
