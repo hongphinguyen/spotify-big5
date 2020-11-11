@@ -82,7 +82,7 @@ export const AnalyticPage = () => {
     currentPlayback,
     setCurrentPlayback,
   ] = useState<SpotifyApi.CurrentPlaybackResponse | null>(null)
-  const [{ token }, setCookie] = useCookies(['token'])
+  const [{ token }, setCookie, removeCookie] = useCookies(['token'])
   const [loading, setLoading] = useState(false)
   const classes = useStyles()
 
@@ -104,15 +104,15 @@ export const AnalyticPage = () => {
       setAccessToken(token)
       setLoading(true)
       Promise.all([
-        getMySavedAlbums({ limit: 9 }).then((res) => {
+        getMySavedAlbums({ limit: 9 }).then(res => {
           setLatestAlbums(res.items)
           return res
         }),
-        getMyRecentlyPlayedTracks({ limit: 9 }).then((res) => {
+        getMyRecentlyPlayedTracks({ limit: 9 }).then(res => {
           setRecentlyPlayedTracks(res.items as PlayHistoryObject[])
           return res
         }),
-        getMyTopTracks({ limit: 9, time_range: 'short_term' }).then((res) => {
+        getMyTopTracks({ limit: 9, time_range: 'short_term' }).then(res => {
           setTopTracks(res.items)
           return res
         }),
@@ -133,7 +133,7 @@ export const AnalyticPage = () => {
           setLoading(false)
         })
         .catch(() => {
-          setCookie('token', null)
+          removeCookie('token')
           window.location.assign(spotifyHref)
         })
     }
